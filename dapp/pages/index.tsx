@@ -1,4 +1,5 @@
 import type { NextPage } from "next";
+import { useState } from "react";
 import { useConnectWallet } from "@web3-onboard/react";
 import { useQuery } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -18,6 +19,9 @@ const Home: NextPage = () => {
 
   const account = wallet?.accounts[0].address || "";
   const accountFormatted = account.slice(0, 4) + "..." + account.slice(-4);
+
+  // Start with the assumption that the user has enough balance to disperse
+  const [isEnoughBalance, setIsEnoughBalance] = useState(true);
 
   const {
     register,
@@ -50,6 +54,12 @@ const Home: NextPage = () => {
     const amounts = data.receivers.map((receiver: IReceiver) => ethers.utils.parseEther(receiver.amount.toString()));
     const total = amounts.reduce((a, b) => a.add(b), ZERO_BN);
 
+    // Check if enough balance
+    if (total.gte(balance)) {
+      setIsEnoughBalance(false);
+      return;
+    }
+
     // Get the signer from web3-onboard wallet
     const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
     const signer = ethersProvider.getSigner();
@@ -57,6 +67,8 @@ const Home: NextPage = () => {
     // Send the Disperse transaction
     const disperseReq = disperse.connect(signer).disperseEther(addresses, amounts, { value: total });
     const { data: disperseTxn, err: disperseTxnErr } = await handle(disperseReq);
+
+    setIsEnoughBalance(true);
 
     // Verify if the transaction was successful
     if (disperseTxnErr || !disperseTxn) return console.error("Disperse transaction failed!");
@@ -122,7 +134,6 @@ const Home: NextPage = () => {
 
             <form className="mt-10" onSubmit={handleSubmit(onFormSubmit)}>
               <h4 className="text-sm font-bold mb-1">Send ETH</h4>
-
               <div className="bg-slate-700 p-8 rounded-lg w-full">
                 {receivers.map((receiver, idx) => (
                   <section key={receiver.id} className="grid grid-cols-12 items-end mb-6">
@@ -151,6 +162,9 @@ const Home: NextPage = () => {
                             required: true,
                             valueAsNumber: true,
                             min: 0.0001,
+                            onChange(event) {
+                              setIsEnoughBalance(true);
+                            },
                           })}
                         />
                       </div>
@@ -186,8 +200,10 @@ const Home: NextPage = () => {
                   </button>
                 </div>
               </div>
-
-              <button className="btn-main bg-slate-700 py-4 hover:bg-indigo-800 hover:ring-0 w-full">Send</button>
+              <div>
+                <button className="btn-main bg-slate-700 py-4 hover:bg-indigo-800 hover:ring-0 w-full">Send</button>
+                {!isEnoughBalance && <p className="form-err">Not enough balance</p>}
+              </div>{" "}
             </form>
           </div>
         )}
