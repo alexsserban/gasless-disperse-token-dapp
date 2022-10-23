@@ -7,7 +7,7 @@ import useWeb3 from "hooks/useWeb3";
 import { ZERO_BN, handle, getReadableBN } from "utils";
 
 const Home: NextPage = () => {
-  const { provider, setEthersProvider } = useWeb3();
+  const { provider } = useWeb3();
   const [{ wallet }, connect] = useConnectWallet();
 
   const account = wallet?.accounts[0].address || "";
@@ -36,11 +36,6 @@ const Home: NextPage = () => {
   });
 
   const onFormSubmit = (data: any) => console.log(data);
-
-  const connectWallet = async () => {
-    const wallets = await connect();
-    setEthersProvider(wallets[0].provider);
-  };
 
   const fetchBalance = async () => {
     if (!provider || !account) return ZERO_BN;
@@ -75,7 +70,7 @@ const Home: NextPage = () => {
         <h1 className="text-3xl">Disperse Dapp</h1>
 
         {!wallet ? (
-          <button className="btn-wallet" onClick={connectWallet}>
+          <button className="btn-wallet" onClick={() => connect()}>
             Connect Wallet
           </button>
         ) : (
@@ -94,7 +89,7 @@ const Home: NextPage = () => {
               {isBalanceError ? (
                 <div>Error...</div>
               ) : !provider || !account || isBalanceLoading ? (
-                <div className="flex h-14 bg-slate-700 rounded-lg w-40 animate-pulse"></div>
+                <div className="flex h-14 bg-slate-700 rounded-lg w-full animate-pulse"></div>
               ) : (
                 <div className="text-2xl bg-slate-700 p-3 rounded-lg">{getReadableBN(balance)} ETH</div>
               )}

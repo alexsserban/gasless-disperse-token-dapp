@@ -44,17 +44,11 @@ const onboard = init({
 });
 
 const Web3Context = createContext<{
-  provider: ethers.providers.Web3Provider | null;
-  setEthersProvider: (provider: ethers.providers.ExternalProvider) => void;
+  provider: ethers.providers.InfuraProvider | ethers.providers.BaseProvider | undefined;
 } | null>(null);
 
 const Web3 = ({ children }: { children: ReactNode }) => {
-  const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
-
-  const setEthersProvider = (provider: ethers.providers.ExternalProvider) => {
-    const ethersProvider = new ethers.providers.Web3Provider(provider, "goerli");
-    setProvider(ethersProvider);
-  };
+  const [provider, setProvider] = useState<ethers.providers.InfuraProvider | ethers.providers.BaseProvider>();
 
   const initContext = useCallback(async () => {
     /**********************************************************/
@@ -64,11 +58,9 @@ const Web3 = ({ children }: { children: ReactNode }) => {
     const previouslyConnectedWallets = JSON.parse(window.localStorage.getItem("connectedWallets") || "");
 
     if (previouslyConnectedWallets.length) {
-      const wallets = await onboard.connectWallet({
+      await onboard.connectWallet({
         autoSelect: { label: previouslyConnectedWallets[0], disableModals: true },
       });
-
-      setEthersProvider(wallets[0].provider);
     }
 
     /**********************************************************/
@@ -81,6 +73,21 @@ const Web3 = ({ children }: { children: ReactNode }) => {
       window.localStorage.setItem("connectedWallets", JSON.stringify(connectedWallets));
     });
 
+    /**********************************************************/
+    /* Web3 provider */
+    /**********************************************************/
+
+    if (process.env.NEXT_PUBLIC_NETWORK === "http://localhost:8545")
+      setProvider(ethers.providers.getDefaultProvider(process.env.NEXT_PUBLIC_NETWORK));
+    else
+      setProvider(
+        new ethers.providers.InfuraProvider(process.env.NEXT_PUBLIC_NETWORK, {
+          infura: {
+            projectId: process.env.NEXT_PUBLIC_INFURA_KEY,
+          },
+        })
+      );
+
     return () => {
       unsubscribe(); // Unsubscribe from the wallets subscription on unmount
     };
@@ -90,7 +97,7 @@ const Web3 = ({ children }: { children: ReactNode }) => {
     initContext();
   }, [initContext]);
 
-  const value = { provider, setEthersProvider };
+  const value = { provider };
   return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
 };
 
