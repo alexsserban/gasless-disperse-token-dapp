@@ -1,6 +1,9 @@
 import type { NextPage } from "next";
 import { useConnectWallet } from "@web3-onboard/react";
+import { useQuery } from "@tanstack/react-query";
+
 import useWeb3 from "hooks/useWeb3";
+import { ZERO_BN, handle, getReadableBN } from "utils";
 
 const Home: NextPage = () => {
   const { provider, setEthersProvider } = useWeb3();
@@ -14,15 +17,32 @@ const Home: NextPage = () => {
     setEthersProvider(wallets[0].provider);
   };
 
-  const getBalance = async () => {
-    if (!provider) return console.error("No provider");
+  const fetchBalance = async () => {
+    if (!provider || !account) return ZERO_BN;
 
-    const address = wallet?.accounts[0].address;
-    if (!address) return console.error("No wallet address");
+    console.log("Fetching user's ether balance...");
 
-    const balance = await provider.getBalance(address);
-    console.log(balance.toString());
+    const balanceRequest = provider.getBalance(account);
+    const { data, err } = await handle(balanceRequest);
+
+    if (err || !data) {
+      console.error("Error fetching user's ether balance!");
+      return ZERO_BN;
+    }
+
+    console.log("User ether balance fetched.");
+    return data;
   };
+
+  const {
+    data: balance,
+    isLoading: isBalanceLoading,
+    isError: isBalanceError,
+    refetch: refetchBalance,
+  } = useQuery(["balance"], fetchBalance, {
+    enabled: !!(provider && account),
+    initialData: ZERO_BN,
+  });
 
   return (
     <div className="bg-slate-800 min-h-screen text-white p-10">
@@ -38,12 +58,24 @@ const Home: NextPage = () => {
         )}
       </div>
 
-      <div className="flex justify-center mt-24">
+      <div className="mt-24">
         {!wallet ? (
-          <div className="bg-slate-600 p-12 rounded-lg text-lg">Connect your wallet to view the app</div>
+          <div className="text-center">Connect your wallet to view the app</div>
         ) : (
-          <button onClick={getBalance}>Get Balance</button>
-        )}{" "}
+          <div className="w-full flex flex-col items-center gap-10">
+            <div>
+              <h4 className="text-sm font-bold mb-1">Balance</h4>
+
+              {isBalanceError ? (
+                <div>Error...</div>
+              ) : !provider || !account || isBalanceLoading ? (
+                <div className="flex h-14 bg-slate-700 rounded-lg w-40 animate-pulse"></div>
+              ) : (
+                <p className="text-2xl bg-slate-700 p-3 rounded-lg">{getReadableBN(balance)} ETH</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
