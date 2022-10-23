@@ -2,12 +2,18 @@ import type { NextPage } from "next";
 import { useConnectWallet } from "@web3-onboard/react";
 import { useQuery } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
+import { ethers } from "ethers";
 
 import useWeb3 from "hooks/useWeb3";
 import { ZERO_BN, handle, getReadableBN } from "utils";
 
+interface IReceiver {
+  address: string;
+  amount: number;
+}
+
 const Home: NextPage = () => {
-  const { provider } = useWeb3();
+  const { provider, disperse } = useWeb3();
   const [{ wallet }, connect] = useConnectWallet();
 
   const account = wallet?.accounts[0].address || "";
@@ -35,8 +41,27 @@ const Home: NextPage = () => {
     control,
   });
 
-  const onFormSubmit = (data: any) => console.log(data);
+  const onFormSubmit = async (data: { receivers: IReceiver[] }) => {
+    if (!disperse) return console.error("Can't connect to the disperse contract!");
+    if (!wallet) return console.error("Wallet not available!");
 
+    // Separate the receiver in addresses / amounts as the Disperse contract expects
+    const addresses = data.receivers.map((receiver: IReceiver) => receiver.address);
+    const amounts = data.receivers.map((receiver: IReceiver) => ethers.utils.parseEther(receiver.amount.toString()));
+    const total = amounts.reduce((a, b) => a.add(b), ZERO_BN);
+
+    // Get the signer from web3-onboard wallet
+    const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
+    const signer = ethersProvider.getSigner();
+
+    // Send the Disperse transaction
+    const disperseReq = disperse.connect(signer).disperseEther(addresses, amounts, { value: total });
+    const { data: disperseTxn, err: disperseTxnErr } = await handle(disperseReq);
+
+    // Verify if the transaction was successful
+    if (disperseTxnErr || !disperseTxn) return console.error("Disperse transaction failed!");
+    console.log("Disperse transaction successful! ", disperseTxn.hash);
+  };
   const fetchBalance = async () => {
     if (!provider || !account) return ZERO_BN;
 
@@ -120,7 +145,6 @@ const Home: NextPage = () => {
 
                         <input
                           type="number"
-                          step="0.1"
                           className="input"
                           {...register(`receivers.${idx}.amount`, {
                             required: true,
