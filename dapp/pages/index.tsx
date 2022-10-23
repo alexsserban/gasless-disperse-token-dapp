@@ -28,6 +28,10 @@ const Home: NextPage = () => {
   // Start with the assumption that the user has enough token balance to disperse
   const [isEnoughTokeBalance, setIsEnoughTokeBalance] = useState(true);
 
+  /**********************************************************/
+  /* Form state */
+  /**********************************************************/
+
   const {
     register,
     handleSubmit,
@@ -53,7 +57,7 @@ const Home: NextPage = () => {
   });
 
   /**********************************************************/
-  /* User's ETH and Token Balance */
+  /* User's ETH Balance */
   /**********************************************************/
 
   const fetchBalance = async () => {
@@ -84,7 +88,7 @@ const Home: NextPage = () => {
   });
 
   /**********************************************************/
-  /* User's Token Balance */
+  /* User's Token Balance, Decimals and Allowances */
   /**********************************************************/
 
   const initialData = { balance: ZERO_BN, decimals: 18, allowance: { disperse: ZERO_BN, disperseGasless: ZERO_BN } };
@@ -92,7 +96,7 @@ const Home: NextPage = () => {
   const fetchUserToken = async () => {
     if (!token || !disperse || !disperseGasless || !userAddress) return initialData;
 
-    console.log("Fetching user's token balance...");
+    console.log("Fetching user's token data...");
 
     const tokenAddress = getValues("tokenAddress");
     const tokenContract = token.attach(tokenAddress);
@@ -105,7 +109,6 @@ const Home: NextPage = () => {
     ]);
 
     let { data, err } = await handle(requests);
-
     if (err || !data || data.length !== 4) {
       console.error("Error fetching user's token data!");
       return initialData;
@@ -135,27 +138,18 @@ const Home: NextPage = () => {
   };
 
   const approve = async () => {
-    if (!disperse) return console.error("Can't connect to the disperse contract!");
-    if (!disperseGasless) return console.error("Can't connect to the disperseGasless contract!");
-    if (!token) return console.error("Token not available!");
-    if (!wallet) return console.error("Wallet not available!");
-    if (!provider) return console.error("Provider not available!");
+    if (!provider || !token || !disperse || !disperseGasless || !wallet) return console.error("Can't connect to the contracts!");
 
     // Get the signer from web3-onboard wallet
     const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
     const signer = ethersProvider.getSigner();
+
     const tokenAddress = getValues("tokenAddress");
+    const tokenAttached = token.attach(tokenAddress);
     let approveReq;
 
-    if (!isGasless) approveReq = token.attach(tokenAddress).connect(signer).approve(disperse.address, userToken.balance);
+    if (!isGasless) approveReq = tokenAttached.connect(signer).approve(disperse.address, userToken.balance);
     else {
-      const owner = wallet.accounts[0].address;
-      const spender = disperseGasless.address;
-      const value = userToken.balance.toString();
-      const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
-
-      const actualToken = token.attach(tokenAddress);
-
       const domainType = [
         { name: "name", type: "string" },
         { name: "version", type: "string" },
@@ -171,7 +165,12 @@ const Home: NextPage = () => {
         { name: "deadline", type: "uint256" },
       ];
 
-      const requests = Promise.all([actualToken.name(), provider.getNetwork(), actualToken.nonces(owner)]);
+      const owner = wallet.accounts[0].address;
+      const spender = disperseGasless.address;
+      const value = userToken.balance.toString();
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutes from the current time, in seconds
+
+      const requests = Promise.all([tokenAttached.name(), provider.getNetwork(), tokenAttached.nonces(owner)]);
       const { data, err } = await handle(requests);
 
       if (err || !data || data.length != 3) return console.error("Can't get Token Name, ChainID and User Nonce!");
@@ -202,10 +201,12 @@ const Home: NextPage = () => {
         message: permit,
       });
 
+      // Request the user to sign the permit request
       const signatureReq = await ethersProvider.send("eth_signTypedData_v4", [owner, dataToSign]);
       const { data: signature, err: signatureErr } = await handle(signatureReq.json());
       if (signatureErr || !signature) return console.error("Can't get user signature!");
 
+      // Send the permit transaction from the private signer in the backend API
       const apiReq = fetch("/api/approve-gasless", {
         method: "POST",
         headers: {
@@ -229,9 +230,7 @@ const Home: NextPage = () => {
   /**********************************************************/
 
   const onFormSubmit = async (data: { receivers: IReceiver[] }) => {
-    if (!disperse) return console.error("Can't connect to the disperse contract!");
-    if (!disperseGasless) return console.error("Can't connect to the disperseGasless contract!");
-    if (!wallet) return console.error("Wallet not available!");
+    if (!disperse || !disperseGasless || !wallet) return console.error("Can't connect to the contracts!");
 
     // Separate the receiver in addresses / amounts as the Disperse contract expects
     const addresses = data.receivers.map((receiver: IReceiver) => receiver.address);
