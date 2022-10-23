@@ -1,1 +1,1 @@
-# disperse-dapp
+# Next.js project
