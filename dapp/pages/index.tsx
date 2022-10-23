@@ -146,10 +146,11 @@ const Home: NextPage = () => {
                         <input
                           type="number"
                           className="input"
+                          step="0.0001"
                           {...register(`receivers.${idx}.amount`, {
                             required: true,
                             valueAsNumber: true,
-                            min: 0.001,
+                            min: 0.0001,
                           })}
                         />
                       </div>
@@ -173,7 +174,7 @@ const Home: NextPage = () => {
                       {formErrors.receivers?.[idx]?.amount?.type === "required" ? (
                         <p className="form-err">Amount Required</p>
                       ) : (
-                        formErrors.receivers?.[idx]?.amount?.type === "min" && <p className="form-err">Minimum Amount is 0.001</p>
+                        formErrors.receivers?.[idx]?.amount?.type === "min" && <p className="form-err">Minimum Amount is 0.0001</p>
                       )}
                     </div>
                   </section>
