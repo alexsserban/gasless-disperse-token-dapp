@@ -1,3 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  .btn-main {
+    @apply bg-indigo-800 p-4 rounded-lg text-xl;
+  }
+}
