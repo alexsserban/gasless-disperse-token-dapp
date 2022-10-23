@@ -395,7 +395,7 @@ const Home: NextPage = () => {
             </div>
 
             <form className="mt-10" onSubmit={handleSubmit(onFormSubmit)}>
-              <h4 className="mb-1 text-sm font-bold">Send ETH</h4>
+              <h4 className="mb-1 text-sm font-bold">Send Tokens</h4>
 
               <div className="w-full p-8 rounded-lg bg-slate-700">
                 {receivers.map((receiver, idx) => (
