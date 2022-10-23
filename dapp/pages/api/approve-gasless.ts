@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 
+import { handle } from "utils";
+
 import Token from "contracts/artifacts/contracts/Token.sol/Token.json";
 import type { Token as IToken } from "contracts/typechain-types/contracts/Token";
 
@@ -20,9 +22,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const wallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
   const token = new ethers.Contract(tokenAddress, Token.abi, wallet) as IToken;
-
   const { v, r, s } = ethers.utils.splitSignature(signature as ethers.Signature);
 
-  let { hash } = await token.permit(owner, spender, value, deadline, v, r, s);
-  return res.status(200).json({ hash });
+  const permitReq = token.permit(owner, spender, value, deadline, v, r, s);
+  const { data, err } = await handle(permitReq);
+  if (err || !data || !data.hash) return res.status(500).json({ error: "Can't send permit transaction", reason: err });
+
+  return res.status(200).json({ txHash: data.hash });
 }

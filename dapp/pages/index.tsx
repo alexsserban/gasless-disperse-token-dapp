@@ -222,7 +222,7 @@ const Home: NextPage = () => {
       const { data: signature, err: signatureErr } = await handle(signatureReq.json());
       if (signatureErr || !signature) return console.error("Can't get user signature!");
 
-      const response = await fetch("/api/approve-gasless", {
+      const apiReq = fetch("/api/approve-gasless", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -230,8 +230,11 @@ const Home: NextPage = () => {
         body: JSON.stringify({ tokenAddress, owner, spender, value, deadline, signature }),
       });
 
-      const { data: apiData, err: apiErr } = await handle(response.json());
-      if (apiErr || !apiData || apiData.txHash) return console.error("Can't send approval from the API!");
+      const { data: apiResponse, err: apiResponseErr } = await handle(apiReq);
+      if (apiResponseErr || !apiResponse) return console.error("Can't send approval from the API!");
+
+      const { data: apiData, err: apiDataErr } = await handle(apiResponse.json());
+      if (apiDataErr || !apiData || !apiData.txHash) return console.error("Can't parse API response!");
 
       console.log("Approval sent from the API: ", apiData.txHash);
     }
