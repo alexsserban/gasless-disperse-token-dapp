@@ -1,5 +1,5 @@
 import type { NextPage } from "next";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useConnectWallet } from "@web3-onboard/react";
 import { useQuery } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -155,36 +155,86 @@ const Home: NextPage = () => {
     if (!disperseGasless) return console.error("Can't connect to the disperseGasless contract!");
     if (!token) return console.error("Token not available!");
     if (!wallet) return console.error("Wallet not available!");
+    if (!provider) return console.error("Provider not available!");
 
     // Get the signer from web3-onboard wallet
     const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
     const signer = ethersProvider.getSigner();
-
     const tokenAddress = getValues("tokenAddress");
     let approveReq;
 
     if (!isGasless) approveReq = token.attach(tokenAddress).connect(signer).approve(disperse.address, userToken.balance);
     else {
-      const biconomy = await getBiconomy(tokenAddress);
-      if (!biconomy) return;
+      const owner = wallet.accounts[0].address;
+      const spender = disperseGasless.address;
+      const value = userToken.balance.toString();
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
 
-      let { data } = await token.attach(tokenAddress).populateTransaction.approve(disperseGasless.address, userToken.balance);
+      const actualToken = token.attach(tokenAddress);
 
-      let txParams = {
-        data,
-        to: tokenAddress,
-        from: wallet.accounts[0].address,
-        signatureType: "EIP712_SIGN",
+      const domainType = [
+        { name: "name", type: "string" },
+        { name: "version", type: "string" },
+        { name: "chainId", type: "uint256" },
+        { name: "verifyingContract", type: "address" },
+      ];
+
+      const Permit = [
+        { name: "owner", type: "address" },
+        { name: "spender", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" },
+      ];
+
+      const requests = Promise.all([actualToken.name(), provider.getNetwork(), actualToken.nonces(owner)]);
+      const { data, err } = await handle(requests);
+
+      if (err || !data || data.length != 3) return console.error("Can't get Token Name, ChainID and User Nonce!");
+      const [tokenName, chainId, nonce] = data;
+
+      const domain = {
+        name: tokenName,
+        version: "1",
+        verifyingContract: tokenAddress,
+        chainId,
       };
 
-      approveReq = biconomy.provider.request?.({ method: "eth_sendTransaction", params: [txParams] });
+      const permit = {
+        owner,
+        spender,
+        value,
+        nonce: nonce.toString(),
+        deadline,
+      };
+
+      const dataToSign = JSON.stringify({
+        types: {
+          EIP712Domain: domainType,
+          Permit: Permit,
+        },
+        domain: domain,
+        primaryType: "Permit",
+        message: permit,
+      });
+
+      const signatureReq = await ethersProvider.send("eth_signTypedData_v4", [owner, dataToSign]);
+      const { data: signature, err: signatureErr } = await handle(signatureReq.json());
+      if (signatureErr || !signature) return console.error("Can't get user signature!");
+
+      const response = await fetch("/api/approve-gasless", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ tokenAddress, owner, spender, value, deadline, signature }),
+      });
+
+      const { data: apiData, err: apiErr } = await handle(response.json());
+      if (apiErr || !apiData || apiData.txHash) return console.error("Can't send approval from the API!");
+
+      console.log("Approval sent from the API: ", apiData.txHash);
     }
-
-    if (!approveReq) return;
-    const { data, err } = await handle(approveReq);
-    if (err || !data) return console.error("Approve transaction failed!", err);
-
-    refetchUserToken();
   };
 
   /**********************************************************/
@@ -220,7 +270,6 @@ const Home: NextPage = () => {
       if (!biconomy) return;
 
       let { data } = await disperseGasless.populateTransaction.disperseTokenSimple(tokenAddress, addresses, amounts);
-
       let txParams = {
         data,
         to: disperseGasless.address,
