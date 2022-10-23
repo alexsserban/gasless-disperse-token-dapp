@@ -1,6 +1,7 @@
-import { createContext, ReactNode, useCallback, useEffect } from "react";
+import { createContext, ReactNode, useCallback, useEffect, useState } from "react";
 import { init } from "@web3-onboard/react";
 import injectedModule from "@web3-onboard/injected-wallets";
+import { ethers } from "ethers";
 
 import SVG from "public/apple.svg";
 
@@ -42,9 +43,19 @@ const onboard = init({
   },
 });
 
-const Web3Context = createContext<{} | null>(null);
+const Web3Context = createContext<{
+  provider: ethers.providers.Web3Provider | null;
+  setEthersProvider: (provider: ethers.providers.ExternalProvider) => void;
+} | null>(null);
 
 const Web3 = ({ children }: { children: ReactNode }) => {
+  const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
+
+  const setEthersProvider = (provider: ethers.providers.ExternalProvider) => {
+    const ethersProvider = new ethers.providers.Web3Provider(provider, "goerli");
+    setProvider(ethersProvider);
+  };
+
   const initContext = useCallback(async () => {
     /**********************************************************/
     /* Auto-connect to Wallet */
@@ -53,9 +64,11 @@ const Web3 = ({ children }: { children: ReactNode }) => {
     const previouslyConnectedWallets = JSON.parse(window.localStorage.getItem("connectedWallets") || "");
 
     if (previouslyConnectedWallets.length) {
-      await onboard.connectWallet({
+      const wallets = await onboard.connectWallet({
         autoSelect: { label: previouslyConnectedWallets[0], disableModals: true },
       });
+
+      setEthersProvider(wallets[0].provider);
     }
 
     /**********************************************************/
@@ -77,7 +90,7 @@ const Web3 = ({ children }: { children: ReactNode }) => {
     initContext();
   }, [initContext]);
 
-  const value = {};
+  const value = { provider, setEthersProvider };
   return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
 };
 
