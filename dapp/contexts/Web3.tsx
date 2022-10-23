@@ -5,6 +5,9 @@ import { ethers } from "ethers";
 
 import SVG from "public/apple.svg";
 
+import Disperse from "contracts/artifacts/contracts/Disperse.sol/Disperse.json";
+import type { Disperse as IDisperse } from "contracts/typechain-types/Disperse";
+
 const injected = injectedModule();
 const onboard = init({
   wallets: [injected],
@@ -45,10 +48,12 @@ const onboard = init({
 
 const Web3Context = createContext<{
   provider: ethers.providers.InfuraProvider | ethers.providers.BaseProvider | undefined;
+  disperse: IDisperse | undefined;
 } | null>(null);
 
 const Web3 = ({ children }: { children: ReactNode }) => {
   const [provider, setProvider] = useState<ethers.providers.InfuraProvider | ethers.providers.BaseProvider>();
+  const [disperse, setDisperse] = useState<IDisperse>();
 
   const initContext = useCallback(async () => {
     /**********************************************************/
@@ -88,6 +93,12 @@ const Web3 = ({ children }: { children: ReactNode }) => {
         })
       );
 
+    /**********************************************************/
+    /* Contracts */
+    /**********************************************************/
+
+    setDisperse(new ethers.Contract(process.env.NEXT_PUBLIC_DISPERSE_ADDRESS, Disperse.abi, provider) as IDisperse);
+
     return () => {
       unsubscribe(); // Unsubscribe from the wallets subscription on unmount
     };
@@ -97,7 +108,7 @@ const Web3 = ({ children }: { children: ReactNode }) => {
     initContext();
   }, [initContext]);
 
-  const value = { provider };
+  const value = { provider, disperse };
   return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
 };
 
