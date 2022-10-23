@@ -191,7 +191,7 @@ const Home: NextPage = () => {
       const { data, err } = await handle(requests);
 
       if (err || !data || data.length != 3) return console.error("Can't get Token Name, ChainID and User Nonce!");
-      const [tokenName, chainId, nonce] = data;
+      const [tokenName, { chainId }, nonce] = data;
 
       const domain = {
         name: tokenName,
