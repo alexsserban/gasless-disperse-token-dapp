@@ -11,6 +11,7 @@ const handle = <T>(promise: Promise<T>) => {
     .catch((err: any) => Promise.resolve({ data: undefined, err }));
 };
 
-const getReadableBN = (bn: ethers.BigNumber, decimals?: number) => parseFloat(ethers.utils.formatUnits(bn, decimals || 18)).toLocaleString("en-US");
+const getReadableBN = (bn: ethers.BigNumber, decimals?: number) =>
+  parseFloat(ethers.utils.formatUnits(bn, decimals || 18)).toLocaleString("en-US", { maximumFractionDigits: 6 });
 
 export { ZERO_BN, handle, getReadableBN };
