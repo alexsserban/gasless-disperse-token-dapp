@@ -39,13 +39,13 @@ const Home: NextPage = () => {
     control,
     formState: { errors: formErrors },
     getValues,
+    reset,
   } = useForm({
     mode: "onBlur",
     reValidateMode: "onChange",
     defaultValues: {
       receivers: [{ address: "", amount: 0 }],
       tokenAddress: "",
-      mintReceiverAddress: "",
     },
   });
 
@@ -63,6 +63,7 @@ const Home: NextPage = () => {
     register: mintRegister,
     handleSubmit: mintHandleSubmit,
     formState: { errors: mintFormErrors },
+    reset: mintReset,
   } = useForm({
     mode: "onBlur",
     reValidateMode: "onChange",
@@ -159,13 +160,12 @@ const Home: NextPage = () => {
       return console.error("Can't approve!");
 
     const tokenAttached = token?.attach(tokenAddress);
-    let approveReq;
 
     // Get the signer from web3-onboard wallet
     const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
     const signer = ethersProvider.getSigner();
 
-    if (!isGasless) approveReq = tokenAttached.connect(signer).approve(disperse.address, userToken.balance);
+    if (!isGasless) await tokenAttached.connect(signer).approve(disperse.address, userToken.balance);
     else {
       const domainType = [
         { name: "name", type: "string" },
@@ -219,8 +219,8 @@ const Home: NextPage = () => {
       });
 
       // Request the user to sign the permit request
-      const signatureReq = await ethersProvider.send("eth_signTypedData_v4", [owner, dataToSign]);
-      const { data: signature, err: signatureErr } = await handle(signatureReq.json());
+      const signatureReq = ethersProvider.send("eth_signTypedData_v4", [owner, dataToSign]);
+      const { data: signature, err: signatureErr } = await handle(signatureReq);
       if (signatureErr || !signature) return console.error("Can't get user signature!");
 
       // Send the permit transaction from the private signer in the backend API
@@ -287,6 +287,7 @@ const Home: NextPage = () => {
     const { data: disperseTxn, err: disperseTxnErr } = await handle(disperseReq);
 
     setIsEnoughTokeBalance(true);
+    reset({ receivers });
 
     // Verify if the transaction was successful
     if (disperseTxnErr || !disperseTxn) return console.error("Disperse transaction failed!");
@@ -296,16 +297,20 @@ const Home: NextPage = () => {
   const onMintFormSubmit = async ({ address }: { address: string }) => {
     const tokenAddress = getValues("tokenAddress");
 
-    if (!token || !tokenAddress || formErrors.tokenAddress) return console.error("Can't mint!");
+    if (!token || !tokenAddress || formErrors.tokenAddress || !wallet) return console.error("Can't mint!");
 
-    const mintReq = token.attach(tokenAddress).mint(address, ethers.utils.parseEther("100000"));
+    const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
+    const signer = ethersProvider.getSigner();
+
+    const mintReq = token.attach(tokenAddress).connect(signer).mint(address, ethers.utils.parseUnits("100000", userToken.decimals));
     const { data, err } = await handle(mintReq);
 
-    if (err || !data) return console.error("Error minting tokens!");
+    if (err || !data) return console.error("Error minting tokens!", err);
 
     await data.wait();
     console.log("Tokens minted!");
 
+    mintReset();
     await Promise.all([refetchBalance(), refetchUserToken()]);
   };
 
@@ -469,7 +474,7 @@ const Home: NextPage = () => {
 
             <form className="mt-10" onSubmit={mintHandleSubmit(onMintFormSubmit)}>
               <div>
-                <label>Address</label>
+                <label>Receiver Address</label>
 
                 <input
                   type="text"
