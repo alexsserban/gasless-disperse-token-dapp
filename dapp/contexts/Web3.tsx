@@ -3,8 +3,6 @@ import { init } from "@web3-onboard/react";
 import injectedModule from "@web3-onboard/injected-wallets";
 import { ethers } from "ethers";
 
-import SVG from "public/apple.svg";
-
 import Disperse from "contracts/artifacts/contracts/Disperse.sol/Disperse.json";
 import type { Disperse as IDisperse } from "contracts/typechain-types/Disperse";
 
@@ -28,7 +26,7 @@ const onboard = init({
   apiKey: process.env.NEXT_PUBLIC_BLOCK_NATIVE_KEY,
   appMetadata: {
     name: "Disperse Dapp",
-    icon: SVG,
+    icon: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" /></svg>',
     description: "Distribute tokens to multiple addresses with gasless transaction",
     recommendedInjectedWallets: [{ name: "MetaMask", url: "https://metamask.io" }],
   },
