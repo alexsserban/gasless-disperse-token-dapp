@@ -29,9 +29,10 @@ const Home: NextPage = () => {
   const [isEnoughTokeBalance, setIsEnoughTokeBalance] = useState(true);
 
   /**********************************************************/
-  /* Form state */
+  /* Form states */
   /**********************************************************/
 
+  // Disperse form
   const {
     register,
     handleSubmit,
@@ -44,6 +45,7 @@ const Home: NextPage = () => {
     defaultValues: {
       receivers: [{ address: "", amount: 0 }],
       tokenAddress: "",
+      mintReceiverAddress: "",
     },
   });
 
@@ -54,6 +56,19 @@ const Home: NextPage = () => {
   } = useFieldArray({
     name: "receivers",
     control,
+  });
+
+  // Mint form
+  const {
+    register: mintRegister,
+    handleSubmit: mintHandleSubmit,
+    formState: { errors: mintFormErrors },
+  } = useForm({
+    mode: "onBlur",
+    reValidateMode: "onChange",
+    defaultValues: {
+      address: "",
+    },
   });
 
   /**********************************************************/
@@ -138,15 +153,17 @@ const Home: NextPage = () => {
   };
 
   const approve = async () => {
-    if (!provider || !token || !disperse || !disperseGasless || !wallet) return console.error("Can't connect to the contracts!");
+    const tokenAddress = getValues("tokenAddress");
+
+    if (!provider || !token || !disperse || !disperseGasless || !wallet || !tokenAddress || formErrors.tokenAddress)
+      return console.error("Can't approve!");
+
+    const tokenAttached = token?.attach(tokenAddress);
+    let approveReq;
 
     // Get the signer from web3-onboard wallet
     const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
     const signer = ethersProvider.getSigner();
-
-    const tokenAddress = getValues("tokenAddress");
-    const tokenAttached = token.attach(tokenAddress);
-    let approveReq;
 
     if (!isGasless) approveReq = tokenAttached.connect(signer).approve(disperse.address, userToken.balance);
     else {
@@ -276,6 +293,22 @@ const Home: NextPage = () => {
     console.log("Disperse transaction successful! ", disperseTxn.hash);
   };
 
+  const onMintFormSubmit = async ({ address }: { address: string }) => {
+    const tokenAddress = getValues("tokenAddress");
+
+    if (!token || !tokenAddress || formErrors.tokenAddress) return console.error("Can't mint!");
+
+    const mintReq = token.attach(tokenAddress).mint(address, ethers.utils.parseEther("100000"));
+    const { data, err } = await handle(mintReq);
+
+    if (err || !data) return console.error("Error minting tokens!");
+
+    await data.wait();
+    console.log("Tokens minted!");
+
+    await Promise.all([refetchBalance(), refetchUserToken()]);
+  };
+
   return (
     <div className="min-h-screen p-10 text-white bg-slate-800">
       <div className="flex items-center justify-between w-full">
@@ -328,15 +361,19 @@ const Home: NextPage = () => {
                   })}
                 />
 
-                {formErrors.tokenAddress?.type === "required" ? (
-                  <p className="form-err">Address Required</p>
-                ) : (
-                  formErrors.tokenAddress?.type === "pattern" && <p className="form-err">Invalid Ethereum Address</p>
-                )}
+                <div className="flex justify-between">
+                  <p className="mt-2 text-xs text-slate-500">*Token needs to be ERC20Permit for Gasless Approve</p>
+
+                  {formErrors.tokenAddress?.type === "required" ? (
+                    <p className="form-err">Address Required</p>
+                  ) : (
+                    formErrors.tokenAddress?.type === "pattern" && <p className="form-err">Invalid Ethereum Address</p>
+                  )}
+                </div>
               </div>
 
               <div>
-                <h4 className={`mb-1 text-sm font-bold ${formErrors.tokenAddress ? "mt-2" : "mt-4"}`}>Token Balance</h4>
+                <h4 className="mt-4 mb-1 text-sm font-bold">Token Balance</h4>
 
                 {isUserTokenError && userToken.toString() != "0" && !formErrors.tokenAddress ? (
                   <div>Error...</div>
@@ -428,6 +465,34 @@ const Home: NextPage = () => {
                 </button>
                 {!isEnoughTokeBalance && <p className="form-err">Not enough balance</p>}
               </div>
+            </form>
+
+            <form className="mt-10" onSubmit={mintHandleSubmit(onMintFormSubmit)}>
+              <div>
+                <label>Address</label>
+
+                <input
+                  type="text"
+                  className="p-4 input bg-slate-700"
+                  {...mintRegister(`address`, {
+                    required: true,
+                    pattern: /^0x[a-fA-F0-9]{40}$/g,
+                  })}
+                />
+
+                {mintFormErrors.address?.type === "required" ? (
+                  <p className="form-err">Address Required</p>
+                ) : (
+                  mintFormErrors.address?.type === "pattern" && <p className="form-err">Invalid Ethereum Address</p>
+                )}
+              </div>
+
+              <button className="btn-action">Mint</button>
+
+              <p className="mt-2 text-xs text-slate-500">
+                *Token needs to expose 'function mint(address to, uint256 amount) external' in order for mint to work <br />
+                *Not gasless
+              </p>
             </form>
           </div>
         )}
