@@ -4,18 +4,22 @@
 
 @layer base {
   .btn-wallet {
-    @apply bg-indigo-800 p-4 rounded-lg text-xl;
+    @apply p-4 text-xl bg-indigo-800 rounded-lg;
   }
 
   .btn-main {
-    @apply bg-slate-600 rounded-lg focus:outline-none hover:ring-4 hover:ring-indigo-800 px-4 py-2 mt-2;
+    @apply px-4 py-2 mt-2 rounded-lg bg-slate-600 focus:outline-none hover:ring-4 hover:ring-indigo-800;
+  }
+
+  .btn-action {
+    @apply w-full py-4 btn-main bg-slate-700 hover:bg-indigo-800 hover:ring-0;
   }
 
   .input {
-    @apply bg-slate-600 w-full p-2 rounded-lg focus:outline-none focus:ring-4 focus:ring-indigo-800;
+    @apply w-full p-2 rounded-lg bg-slate-600 focus:outline-none focus:ring-4 focus:ring-indigo-800;
   }
 
   .form-err {
-    @apply mt-2 text-right text-xs text-red-400;
+    @apply mt-2 text-xs text-right text-red-400;
   }
 }

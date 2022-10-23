@@ -346,7 +346,7 @@ const Home: NextPage = () => {
                   <div className="p-3 text-xl rounded-lg bg-slate-700">{getReadableBN(userToken.balance, userToken.decimals)}</div>
                 )}
 
-                <button className="w-full py-4 mt-4 btn-main bg-slate-700 hover:bg-indigo-800 hover:ring-0" onClick={approve}>
+                <button className="mt-4 btn-action" onClick={approve}>
                   Approve
                 </button>
               </div>
@@ -354,6 +354,7 @@ const Home: NextPage = () => {
 
             <form className="mt-10" onSubmit={handleSubmit(onFormSubmit)}>
               <h4 className="mb-1 text-sm font-bold">Send ETH</h4>
+
               <div className="w-full p-8 rounded-lg bg-slate-700">
                 {receivers.map((receiver, idx) => (
                   <section key={receiver.id} className="grid items-end grid-cols-12 mb-6">
@@ -420,11 +421,9 @@ const Home: NextPage = () => {
                   </button>
                 </div>
               </div>
+
               <div>
-                <button
-                  className={`w-full py-4 btn-main bg-slate-700 hover:bg-indigo-800 hover:ring-0 ${isNotApproved() ? "cursor-not-allowed" : ""}`}
-                  disabled={isNotApproved()}
-                >
+                <button className={`btn-action ${isNotApproved() ? "cursor-not-allowed" : ""}`} disabled={isNotApproved()}>
                   Send
                 </button>
                 {!isEnoughTokeBalance && <p className="form-err">Not enough balance</p>}
