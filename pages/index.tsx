@@ -3,7 +3,7 @@ import { useConnectWallet } from "@web3-onboard/react";
 import useWeb3 from "hooks/useWeb3";
 
 const Home: NextPage = () => {
-  const { setEthersProvider } = useWeb3();
+  const { provider, setEthersProvider } = useWeb3();
   const [{ wallet }, connect] = useConnectWallet();
 
   const account = wallet?.accounts[0].address || "";
@@ -12,6 +12,16 @@ const Home: NextPage = () => {
   const connectWallet = async () => {
     const wallets = await connect();
     setEthersProvider(wallets[0].provider);
+  };
+
+  const getBalance = async () => {
+    if (!provider) return console.error("No provider");
+
+    const address = wallet?.accounts[0].address;
+    if (!address) return console.error("No wallet address");
+
+    const balance = await provider.getBalance(address);
+    console.log(balance.toString());
   };
 
   return (
@@ -29,7 +39,11 @@ const Home: NextPage = () => {
       </div>
 
       <div className="flex justify-center mt-24">
-        {!wallet ? <div className="bg-slate-600 p-12 rounded-lg text-lg">Connect your wallet to view the app</div> : <div>App</div>}
+        {!wallet ? (
+          <div className="bg-slate-600 p-12 rounded-lg text-lg">Connect your wallet to view the app</div>
+        ) : (
+          <button onClick={getBalance}>Get Balance</button>
+        )}{" "}
       </div>
     </div>
   );
