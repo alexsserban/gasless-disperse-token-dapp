@@ -1,9 +1,10 @@
 import type { NextPage } from "next";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConnectWallet } from "@web3-onboard/react";
 import { useQuery } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { ethers } from "ethers";
+import { Biconomy } from "@biconomy/mexa";
 
 import useWeb3 from "hooks/useWeb3";
 import { ZERO_BN, handle, getReadableBN } from "utils";
@@ -14,11 +15,13 @@ interface IReceiver {
 }
 
 const Home: NextPage = () => {
-  const { provider, disperse, token } = useWeb3();
+  const { provider, disperse, disperseGasless, token } = useWeb3();
   const [{ wallet }, connect] = useConnectWallet();
 
   const account = wallet?.accounts[0].address || "";
   const accountFormatted = account.slice(0, 4) + "..." + account.slice(-4);
+
+  const [isGasless, setIsGasless] = useState(false);
 
   // Start with the assumption that the user has enough token balance to disperse
   const [isEnoughTokeBalance, setIsEnoughTokeBalance] = useState(true);
@@ -46,6 +49,24 @@ const Home: NextPage = () => {
     name: "receivers",
     control,
   });
+
+  /**********************************************************/
+  /* Biconomy */
+  /**********************************************************/
+
+  const getBiconomy = async (contract: string) => {
+    if (!wallet) return null;
+
+    const biconomy = new Biconomy(wallet.provider, {
+      apiKey: process.env.NEXT_PUBLIC_BICONOMY_KEY,
+      contractAddresses: [contract],
+      strictMode: false,
+    });
+
+    await biconomy.init();
+
+    return biconomy;
+  };
 
   /**********************************************************/
   /* User's ETH and Token Balance */
@@ -85,23 +106,29 @@ const Home: NextPage = () => {
   const initialData = { balance: ZERO_BN, decimals: 18, allowance: { disperse: ZERO_BN, disperseGasless: ZERO_BN } };
 
   const fetchUserToken = async () => {
-    if (!token || !disperse || !account) return initialData;
+    if (!token || !disperse || !disperseGasless || !account) return initialData;
 
     console.log("Fetching user's token balance...");
 
     const tokenAddress = getValues("tokenAddress");
     const tokenContract = token.attach(tokenAddress);
 
-    let requests = Promise.all([tokenContract.balanceOf(account), tokenContract.decimals(), tokenContract.allowance(account, disperse.address)]);
+    let requests = Promise.all([
+      tokenContract.balanceOf(account),
+      tokenContract.decimals(),
+      tokenContract.allowance(account, disperse.address),
+      tokenContract.allowance(account, disperseGasless.address),
+    ]);
+
     let { data, err } = await handle(requests);
 
-    if (err || !data || data.length !== 3) {
+    if (err || !data || data.length !== 4) {
       console.error("Error fetching user's token data!");
       return initialData;
     }
 
     console.log("User's token data fetched.");
-    return { balance: data[0], decimals: data[1], allowance: { disperse: data[2], disperseGasless: ZERO_BN } };
+    return { balance: data[0], decimals: data[1], allowance: { disperse: data[2], disperseGasless: data[3] } };
   };
 
   const {
@@ -119,12 +146,13 @@ const Home: NextPage = () => {
   /**********************************************************/
 
   const isNotApproved = () => {
-    if (!userToken) return false;
-    return userToken.balance.toString() === "0" || userToken.allowance.disperse.lt(userToken.balance);
+    if (!userToken || userToken.balance.toString() === "0") return true;
+    return isGasless ? userToken.allowance.disperseGasless.lt(userToken.balance) : userToken.allowance.disperse.lt(userToken.balance);
   };
 
   const approve = async () => {
     if (!disperse) return console.error("Can't connect to the disperse contract!");
+    if (!disperseGasless) return console.error("Can't connect to the disperseGasless contract!");
     if (!token) return console.error("Token not available!");
     if (!wallet) return console.error("Wallet not available!");
 
@@ -132,11 +160,28 @@ const Home: NextPage = () => {
     const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
     const signer = ethersProvider.getSigner();
 
-    // Send the Disperse transaction
     const tokenAddress = getValues("tokenAddress");
-    const approveReq = token.attach(tokenAddress).connect(signer).approve(disperse.address, userToken.balance);
-    const { data, err } = await handle(approveReq);
+    let approveReq;
 
+    if (!isGasless) approveReq = token.attach(tokenAddress).connect(signer).approve(disperse.address, userToken.balance);
+    else {
+      const biconomy = await getBiconomy(tokenAddress);
+      if (!biconomy) return;
+
+      let { data } = await token.attach(tokenAddress).populateTransaction.approve(disperseGasless.address, userToken.balance);
+
+      let txParams = {
+        data,
+        to: tokenAddress,
+        from: wallet.accounts[0].address,
+        signatureType: "EIP712_SIGN",
+      };
+
+      approveReq = biconomy.provider.request?.({ method: "eth_sendTransaction", params: [txParams] });
+    }
+
+    if (!approveReq) return;
+    const { data, err } = await handle(approveReq);
     if (err || !data) return console.error("Approve transaction failed!", err);
 
     refetchUserToken();
@@ -148,6 +193,7 @@ const Home: NextPage = () => {
 
   const onFormSubmit = async (data: { receivers: IReceiver[] }) => {
     if (!disperse) return console.error("Can't connect to the disperse contract!");
+    if (!disperseGasless) return console.error("Can't connect to the disperseGasless contract!");
     if (!wallet) return console.error("Wallet not available!");
 
     // Separate the receiver in addresses / amounts as the Disperse contract expects
@@ -165,8 +211,27 @@ const Home: NextPage = () => {
     const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
     const signer = ethersProvider.getSigner();
 
-    // Send the Disperse transaction
-    const disperseReq = disperse.connect(signer).disperseTokenSimple(getValues("tokenAddress"), addresses, amounts);
+    const tokenAddress = getValues("tokenAddress");
+    let disperseReq;
+
+    if (!isGasless) disperseReq = disperse.connect(signer).disperseTokenSimple(tokenAddress, addresses, amounts);
+    else {
+      const biconomy = await getBiconomy(disperseGasless.address);
+      if (!biconomy) return;
+
+      let { data } = await disperseGasless.populateTransaction.disperseTokenSimple(tokenAddress, addresses, amounts);
+
+      let txParams = {
+        data,
+        to: disperseGasless.address,
+        from: wallet.accounts[0].address,
+        signatureType: "EIP712_SIGN",
+      };
+
+      disperseReq = biconomy.provider.request?.({ method: "eth_sendTransaction", params: [txParams] });
+    }
+
+    if (!disperseReq) return;
     const { data: disperseTxn, err: disperseTxnErr } = await handle(disperseReq);
 
     setIsEnoughTokeBalance(true);
@@ -207,7 +272,12 @@ const Home: NextPage = () => {
               )}
             </div>
 
-            <div className="mt-16">
+            <div className="flex gap-4 mt-10 justify-left">
+              <input type="checkbox" defaultChecked={isGasless} onChange={() => setIsGasless(!isGasless)} />
+              <p>Gasless?</p>
+            </div>
+
+            <div className="mt-10">
               <div>
                 <h4 className="mb-1 text-sm font-bold">Token Address</h4>
 
@@ -247,7 +317,7 @@ const Home: NextPage = () => {
               </div>
             </div>
 
-            <form className="mt-16" onSubmit={handleSubmit(onFormSubmit)}>
+            <form className="mt-10" onSubmit={handleSubmit(onFormSubmit)}>
               <h4 className="mb-1 text-sm font-bold">Send ETH</h4>
               <div className="w-full p-8 rounded-lg bg-slate-700">
                 {receivers.map((receiver, idx) => (
