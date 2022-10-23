@@ -6,6 +6,9 @@ import { ethers } from "ethers";
 import Disperse from "contracts/artifacts/contracts/Disperse.sol/Disperse.json";
 import type { Disperse as IDisperse } from "contracts/typechain-types/Disperse";
 
+import DisperseGasless from "contracts/artifacts/contracts/DisperseGaslessV2.sol/DisperseGaslessV2.json";
+import type { DisperseGaslessV2 as IDisperseGasless } from "contracts/typechain-types/contracts/DisperseGaslessV2.sol/DisperseGaslessV2";
+
 const injected = injectedModule();
 const onboard = init({
   wallets: [injected],
@@ -47,23 +50,28 @@ const onboard = init({
 const Web3Context = createContext<{
   provider: ethers.providers.InfuraProvider | ethers.providers.BaseProvider | undefined;
   disperse: IDisperse | undefined;
+  disperseGasless: IDisperseGasless | undefined;
 } | null>(null);
 
 const Web3 = ({ children }: { children: ReactNode }) => {
   const [provider, setProvider] = useState<ethers.providers.InfuraProvider | ethers.providers.BaseProvider>();
   const [disperse, setDisperse] = useState<IDisperse>();
+  const [disperseGasless, setDisperseGasless] = useState<IDisperseGasless>();
 
   const initContext = useCallback(async () => {
     /**********************************************************/
     /* Auto-connect to Wallet */
     /**********************************************************/
 
-    const previouslyConnectedWallets = JSON.parse(window.localStorage.getItem("connectedWallets") || "");
+    const localStorageWallets = window.localStorage.getItem("connectedWallets") || "";
+    if (localStorageWallets) {
+      const previouslyConnectedWallets = JSON.parse(localStorageWallets);
 
-    if (previouslyConnectedWallets.length) {
-      await onboard.connectWallet({
-        autoSelect: { label: previouslyConnectedWallets[0], disableModals: true },
-      });
+      if (previouslyConnectedWallets.length) {
+        await onboard.connectWallet({
+          autoSelect: { label: previouslyConnectedWallets[0], disableModals: true },
+        });
+      }
     }
 
     /**********************************************************/
@@ -80,22 +88,24 @@ const Web3 = ({ children }: { children: ReactNode }) => {
     /* Web3 provider */
     /**********************************************************/
 
-    if (process.env.NEXT_PUBLIC_NETWORK === "http://localhost:8545")
-      setProvider(ethers.providers.getDefaultProvider(process.env.NEXT_PUBLIC_NETWORK));
+    let provider;
+
+    if (process.env.NEXT_PUBLIC_NETWORK === "http://localhost:8545") provider = ethers.providers.getDefaultProvider(process.env.NEXT_PUBLIC_NETWORK);
     else
-      setProvider(
-        new ethers.providers.InfuraProvider(process.env.NEXT_PUBLIC_NETWORK, {
-          infura: {
-            projectId: process.env.NEXT_PUBLIC_INFURA_KEY,
-          },
-        })
-      );
+      provider = new ethers.providers.InfuraProvider(process.env.NEXT_PUBLIC_NETWORK, {
+        infura: {
+          projectId: process.env.NEXT_PUBLIC_INFURA_KEY,
+        },
+      });
+
+    setProvider(provider);
 
     /**********************************************************/
     /* Contracts */
     /**********************************************************/
 
     setDisperse(new ethers.Contract(process.env.NEXT_PUBLIC_DISPERSE_ADDRESS, Disperse.abi, provider) as IDisperse);
+    setDisperseGasless(new ethers.Contract(process.env.NEXT_PUBLIC_DISPERSE_GASLESS_ADDRESS, DisperseGasless.abi, provider) as IDisperseGasless);
 
     return () => {
       unsubscribe(); // Unsubscribe from the wallets subscription on unmount
@@ -106,7 +116,7 @@ const Web3 = ({ children }: { children: ReactNode }) => {
     initContext();
   }, [initContext]);
 
-  const value = { provider, disperse };
+  const value = { provider, disperse, disperseGasless };
   return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
 };
 
