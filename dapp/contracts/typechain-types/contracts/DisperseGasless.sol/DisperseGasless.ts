@@ -9,15 +9,12 @@ import type {
   CallOverrides,
   ContractTransaction,
   Overrides,
+  PayableOverrides,
   PopulatedTransaction,
   Signer,
   utils,
 } from "ethers";
-import type {
-  FunctionFragment,
-  Result,
-  EventFragment,
-} from "@ethersproject/abi";
+import type { FunctionFragment, Result } from "@ethersproject/abi";
 import type { Listener, Provider } from "@ethersproject/providers";
 import type {
   TypedEventFilter,
@@ -29,26 +26,34 @@ import type {
 
 export interface DisperseGaslessInterface extends utils.Interface {
   functions: {
+    "disperseEther(address[],uint256[])": FunctionFragment;
+    "disperseToken(address,address[],uint256[])": FunctionFragment;
     "disperseTokenSimple(address,address[],uint256[])": FunctionFragment;
     "getTrustedForwarder()": FunctionFragment;
     "isTrustedForwarder(address)": FunctionFragment;
-    "owner()": FunctionFragment;
-    "renounceOwnership()": FunctionFragment;
-    "setTrustedForwarder(address)": FunctionFragment;
-    "transferOwnership(address)": FunctionFragment;
   };
 
   getFunction(
     nameOrSignatureOrTopic:
+      | "disperseEther"
+      | "disperseToken"
       | "disperseTokenSimple"
       | "getTrustedForwarder"
       | "isTrustedForwarder"
-      | "owner"
-      | "renounceOwnership"
-      | "setTrustedForwarder"
-      | "transferOwnership"
   ): FunctionFragment;
 
+  encodeFunctionData(
+    functionFragment: "disperseEther",
+    values: [PromiseOrValue<string>[], PromiseOrValue<BigNumberish>[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "disperseToken",
+    values: [
+      PromiseOrValue<string>,
+      PromiseOrValue<string>[],
+      PromiseOrValue<BigNumberish>[]
+    ]
+  ): string;
   encodeFunctionData(
     functionFragment: "disperseTokenSimple",
     values: [
@@ -65,20 +70,15 @@ export interface DisperseGaslessInterface extends utils.Interface {
     functionFragment: "isTrustedForwarder",
     values: [PromiseOrValue<string>]
   ): string;
-  encodeFunctionData(functionFragment: "owner", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "renounceOwnership",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "setTrustedForwarder",
-    values: [PromiseOrValue<string>]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "transferOwnership",
-    values: [PromiseOrValue<string>]
-  ): string;
 
+  decodeFunctionResult(
+    functionFragment: "disperseEther",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "disperseToken",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "disperseTokenSimple",
     data: BytesLike
@@ -91,38 +91,9 @@ export interface DisperseGaslessInterface extends utils.Interface {
     functionFragment: "isTrustedForwarder",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "renounceOwnership",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "setTrustedForwarder",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "transferOwnership",
-    data: BytesLike
-  ): Result;
 
-  events: {
-    "OwnershipTransferred(address,address)": EventFragment;
-  };
-
-  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
+  events: {};
 }
-
-export interface OwnershipTransferredEventObject {
-  previousOwner: string;
-  newOwner: string;
-}
-export type OwnershipTransferredEvent = TypedEvent<
-  [string, string],
-  OwnershipTransferredEventObject
->;
-
-export type OwnershipTransferredEventFilter =
-  TypedEventFilter<OwnershipTransferredEvent>;
 
 export interface DisperseGasless extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
@@ -151,6 +122,19 @@ export interface DisperseGasless extends BaseContract {
   removeListener: OnEvent<this>;
 
   functions: {
+    disperseEther(
+      recipients: PromiseOrValue<string>[],
+      values: PromiseOrValue<BigNumberish>[],
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    disperseToken(
+      token: PromiseOrValue<string>,
+      recipients: PromiseOrValue<string>[],
+      values: PromiseOrValue<BigNumberish>[],
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
     disperseTokenSimple(
       token: PromiseOrValue<string>,
       recipients: PromiseOrValue<string>[],
@@ -166,23 +150,20 @@ export interface DisperseGasless extends BaseContract {
       forwarder: PromiseOrValue<string>,
       overrides?: CallOverrides
     ): Promise<[boolean]>;
-
-    owner(overrides?: CallOverrides): Promise<[string]>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<ContractTransaction>;
-
-    setTrustedForwarder(
-      _trustedForwarder: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<ContractTransaction>;
-
-    transferOwnership(
-      newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<ContractTransaction>;
   };
+
+  disperseEther(
+    recipients: PromiseOrValue<string>[],
+    values: PromiseOrValue<BigNumberish>[],
+    overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  disperseToken(
+    token: PromiseOrValue<string>,
+    recipients: PromiseOrValue<string>[],
+    values: PromiseOrValue<BigNumberish>[],
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
 
   disperseTokenSimple(
     token: PromiseOrValue<string>,
@@ -198,23 +179,20 @@ export interface DisperseGasless extends BaseContract {
     overrides?: CallOverrides
   ): Promise<boolean>;
 
-  owner(overrides?: CallOverrides): Promise<string>;
-
-  renounceOwnership(
-    overrides?: Overrides & { from?: PromiseOrValue<string> }
-  ): Promise<ContractTransaction>;
-
-  setTrustedForwarder(
-    _trustedForwarder: PromiseOrValue<string>,
-    overrides?: Overrides & { from?: PromiseOrValue<string> }
-  ): Promise<ContractTransaction>;
-
-  transferOwnership(
-    newOwner: PromiseOrValue<string>,
-    overrides?: Overrides & { from?: PromiseOrValue<string> }
-  ): Promise<ContractTransaction>;
-
   callStatic: {
+    disperseEther(
+      recipients: PromiseOrValue<string>[],
+      values: PromiseOrValue<BigNumberish>[],
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    disperseToken(
+      token: PromiseOrValue<string>,
+      recipients: PromiseOrValue<string>[],
+      values: PromiseOrValue<BigNumberish>[],
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     disperseTokenSimple(
       token: PromiseOrValue<string>,
       recipients: PromiseOrValue<string>[],
@@ -228,34 +206,24 @@ export interface DisperseGasless extends BaseContract {
       forwarder: PromiseOrValue<string>,
       overrides?: CallOverrides
     ): Promise<boolean>;
-
-    owner(overrides?: CallOverrides): Promise<string>;
-
-    renounceOwnership(overrides?: CallOverrides): Promise<void>;
-
-    setTrustedForwarder(
-      _trustedForwarder: PromiseOrValue<string>,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    transferOwnership(
-      newOwner: PromiseOrValue<string>,
-      overrides?: CallOverrides
-    ): Promise<void>;
   };
 
-  filters: {
-    "OwnershipTransferred(address,address)"(
-      previousOwner?: PromiseOrValue<string> | null,
-      newOwner?: PromiseOrValue<string> | null
-    ): OwnershipTransferredEventFilter;
-    OwnershipTransferred(
-      previousOwner?: PromiseOrValue<string> | null,
-      newOwner?: PromiseOrValue<string> | null
-    ): OwnershipTransferredEventFilter;
-  };
+  filters: {};
 
   estimateGas: {
+    disperseEther(
+      recipients: PromiseOrValue<string>[],
+      values: PromiseOrValue<BigNumberish>[],
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    disperseToken(
+      token: PromiseOrValue<string>,
+      recipients: PromiseOrValue<string>[],
+      values: PromiseOrValue<BigNumberish>[],
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
     disperseTokenSimple(
       token: PromiseOrValue<string>,
       recipients: PromiseOrValue<string>[],
@@ -269,25 +237,22 @@ export interface DisperseGasless extends BaseContract {
       forwarder: PromiseOrValue<string>,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
-
-    owner(overrides?: CallOverrides): Promise<BigNumber>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<BigNumber>;
-
-    setTrustedForwarder(
-      _trustedForwarder: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<BigNumber>;
-
-    transferOwnership(
-      newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
+    disperseEther(
+      recipients: PromiseOrValue<string>[],
+      values: PromiseOrValue<BigNumberish>[],
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    disperseToken(
+      token: PromiseOrValue<string>,
+      recipients: PromiseOrValue<string>[],
+      values: PromiseOrValue<BigNumberish>[],
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
     disperseTokenSimple(
       token: PromiseOrValue<string>,
       recipients: PromiseOrValue<string>[],
@@ -302,22 +267,6 @@ export interface DisperseGasless extends BaseContract {
     isTrustedForwarder(
       forwarder: PromiseOrValue<string>,
       overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<PopulatedTransaction>;
-
-    setTrustedForwarder(
-      _trustedForwarder: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<PopulatedTransaction>;
-
-    transferOwnership(
-      newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
   };
 }
