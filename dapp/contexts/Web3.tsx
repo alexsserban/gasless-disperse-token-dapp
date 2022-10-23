@@ -87,15 +87,11 @@ const Web3 = ({ children }: { children: ReactNode }) => {
     /* Web3 provider */
     /**********************************************************/
 
-    let provider;
-
-    if (process.env.NEXT_PUBLIC_NETWORK === "http://localhost:8545") provider = ethers.providers.getDefaultProvider(process.env.NEXT_PUBLIC_NETWORK);
-    else
-      provider = new ethers.providers.InfuraProvider(process.env.NEXT_PUBLIC_NETWORK, {
-        infura: {
-          projectId: process.env.NEXT_PUBLIC_INFURA_KEY,
-        },
-      });
+    const provider = new ethers.providers.InfuraProvider(process.env.NEXT_PUBLIC_NETWORK, {
+      infura: {
+        projectId: process.env.NEXT_PUBLIC_INFURA_KEY,
+      },
+    });
 
     setProvider(provider);
 
