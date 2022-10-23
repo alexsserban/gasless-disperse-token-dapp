@@ -18,8 +18,8 @@ const Home: NextPage = () => {
   const { provider, disperse, disperseGasless, token } = useWeb3();
   const [{ wallet }, connect] = useConnectWallet();
 
-  const account = wallet?.accounts[0].address || "";
-  const accountFormatted = account.slice(0, 4) + "..." + account.slice(-4);
+  const userAddress = wallet?.accounts[0].address || "";
+  const userAddressFormatted = userAddress.slice(0, 4) + "..." + userAddress.slice(-4);
 
   const [isGasless, setIsGasless] = useState(false);
 
@@ -73,11 +73,11 @@ const Home: NextPage = () => {
   /**********************************************************/
 
   const fetchBalance = async () => {
-    if (!provider || !account) return ZERO_BN;
+    if (!provider || !userAddress) return ZERO_BN;
 
     console.log("Fetching user's ether balance...");
 
-    let balanceRequest = provider.getBalance(account);
+    let balanceRequest = provider.getBalance(userAddress);
     let { data, err } = await handle(balanceRequest);
 
     if (err || !data) {
@@ -95,7 +95,7 @@ const Home: NextPage = () => {
     isError: isBalanceError,
     refetch: refetchBalance,
   } = useQuery(["balance", "eth"], fetchBalance, {
-    enabled: !!(provider && account),
+    enabled: !!(provider && userAddress),
     initialData: ZERO_BN,
   });
 
@@ -106,7 +106,7 @@ const Home: NextPage = () => {
   const initialData = { balance: ZERO_BN, decimals: 18, allowance: { disperse: ZERO_BN, disperseGasless: ZERO_BN } };
 
   const fetchUserToken = async () => {
-    if (!token || !disperse || !disperseGasless || !account) return initialData;
+    if (!token || !disperse || !disperseGasless || !userAddress) return initialData;
 
     console.log("Fetching user's token balance...");
 
@@ -114,10 +114,10 @@ const Home: NextPage = () => {
     const tokenContract = token.attach(tokenAddress);
 
     let requests = Promise.all([
-      tokenContract.balanceOf(account),
+      tokenContract.balanceOf(userAddress),
       tokenContract.decimals(),
-      tokenContract.allowance(account, disperse.address),
-      tokenContract.allowance(account, disperseGasless.address),
+      tokenContract.allowance(userAddress, disperse.address),
+      tokenContract.allowance(userAddress, disperseGasless.address),
     ]);
 
     let { data, err } = await handle(requests);
@@ -137,7 +137,7 @@ const Home: NextPage = () => {
     isError: isUserTokenError,
     refetch: refetchUserToken,
   } = useQuery(["balance", "token"], fetchUserToken, {
-    enabled: !!(token && account),
+    enabled: !!(token && userAddress),
     initialData: initialData,
   });
 
@@ -303,7 +303,7 @@ const Home: NextPage = () => {
             Connect Wallet
           </button>
         ) : (
-          <div className="btn-wallet">{accountFormatted}</div>
+          <div className="btn-wallet">{userAddressFormatted}</div>
         )}
       </div>
 
@@ -317,7 +317,7 @@ const Home: NextPage = () => {
 
               {isBalanceError ? (
                 <div>Error...</div>
-              ) : !provider || !account || isBalanceLoading ? (
+              ) : !provider || !userAddress || isBalanceLoading ? (
                 <div className="flex w-full rounded-lg h-14 bg-slate-700 animate-pulse"></div>
               ) : (
                 <div className="p-3 text-xl rounded-lg bg-slate-700">{getReadableBN(balance)}</div>
@@ -357,7 +357,7 @@ const Home: NextPage = () => {
 
                 {isUserTokenError && userToken.toString() != "0" && !formErrors.tokenAddress ? (
                   <div>Error...</div>
-                ) : !token || !account || isUserTokenLoading ? (
+                ) : !token || !userAddress || isUserTokenLoading ? (
                   <div className="flex w-full rounded-lg h-14 bg-slate-700 animate-pulse"></div>
                 ) : (
                   <div className="p-3 text-xl rounded-lg bg-slate-700">{getReadableBN(userToken.balance, userToken.decimals)}</div>
