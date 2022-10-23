@@ -140,7 +140,7 @@ const Home: NextPage = () => {
     isError: isUserTokenError,
     refetch: refetchUserToken,
   } = useQuery(["balance", "token"], fetchUserToken, {
-    enabled: !!(token && userAddress),
+    enabled: !!(token && userAddress && getValues("tokenAddress")),
     initialData: initialData,
   });
 
