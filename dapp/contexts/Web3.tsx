@@ -9,6 +9,9 @@ import type { Disperse as IDisperse } from "contracts/typechain-types/Disperse";
 import DisperseGasless from "contracts/artifacts/contracts/DisperseGaslessV2.sol/DisperseGaslessV2.json";
 import type { DisperseGaslessV2 as IDisperseGasless } from "contracts/typechain-types/contracts/DisperseGaslessV2.sol/DisperseGaslessV2";
 
+import Token from "contracts/artifacts/contracts/Token.sol/Token.json";
+import type { Token as IToken } from "contracts/typechain-types/contracts/Token";
+
 const injected = injectedModule();
 const onboard = init({
   wallets: [injected],
@@ -51,12 +54,14 @@ const Web3Context = createContext<{
   provider: ethers.providers.InfuraProvider | ethers.providers.BaseProvider | undefined;
   disperse: IDisperse | undefined;
   disperseGasless: IDisperseGasless | undefined;
+  token: IToken | undefined;
 } | null>(null);
 
 const Web3 = ({ children }: { children: ReactNode }) => {
   const [provider, setProvider] = useState<ethers.providers.InfuraProvider | ethers.providers.BaseProvider>();
   const [disperse, setDisperse] = useState<IDisperse>();
   const [disperseGasless, setDisperseGasless] = useState<IDisperseGasless>();
+  const [token, setToken] = useState<IToken>();
 
   const initContext = useCallback(async () => {
     /**********************************************************/
@@ -106,6 +111,7 @@ const Web3 = ({ children }: { children: ReactNode }) => {
 
     setDisperse(new ethers.Contract(process.env.NEXT_PUBLIC_DISPERSE_ADDRESS, Disperse.abi, provider) as IDisperse);
     setDisperseGasless(new ethers.Contract(process.env.NEXT_PUBLIC_DISPERSE_GASLESS_ADDRESS, DisperseGasless.abi, provider) as IDisperseGasless);
+    setToken(new ethers.Contract("0x00", Token.abi, provider) as IToken);
 
     return () => {
       unsubscribe(); // Unsubscribe from the wallets subscription on unmount
@@ -116,7 +122,7 @@ const Web3 = ({ children }: { children: ReactNode }) => {
     initContext();
   }, [initContext]);
 
-  const value = { provider, disperse, disperseGasless };
+  const value = { provider, disperse, disperseGasless, token };
   return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
 };
 
