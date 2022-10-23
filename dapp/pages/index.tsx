@@ -47,36 +47,6 @@ const Home: NextPage = () => {
     control,
   });
 
-  const onFormSubmit = async (data: { receivers: IReceiver[] }) => {
-    if (!disperse) return console.error("Can't connect to the disperse contract!");
-    if (!wallet) return console.error("Wallet not available!");
-
-    // Separate the receiver in addresses / amounts as the Disperse contract expects
-    const addresses = data.receivers.map((receiver: IReceiver) => receiver.address);
-    const amounts = data.receivers.map((receiver: IReceiver) => ethers.utils.parseEther(receiver.amount.toString()));
-    const total = amounts.reduce((a, b) => a.add(b), ZERO_BN);
-
-    // Check if enough balance
-    if (total.gte(balance)) {
-      setIsEnoughTokeBalance(false);
-      return;
-    }
-
-    // Get the signer from web3-onboard wallet
-    const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
-    const signer = ethersProvider.getSigner();
-
-    // Send the Disperse transaction
-    const disperseReq = disperse.connect(signer).disperseEther(addresses, amounts, { value: total });
-    const { data: disperseTxn, err: disperseTxnErr } = await handle(disperseReq);
-
-    setIsEnoughTokeBalance(true);
-
-    // Verify if the transaction was successful
-    if (disperseTxnErr || !disperseTxn) return console.error("Disperse transaction failed!");
-    console.log("Disperse transaction successful! ", disperseTxn.hash);
-  };
-
   /**********************************************************/
   /* User's ETH and Token Balance */
   /**********************************************************/
@@ -112,47 +82,99 @@ const Home: NextPage = () => {
   /* User's Token Balance */
   /**********************************************************/
 
-  const initialData = { balance: ZERO_BN, decimals: 18 };
+  const initialData = { balance: ZERO_BN, decimals: 18, allowance: { disperse: ZERO_BN, disperseGasless: ZERO_BN } };
 
   const fetchUserToken = async () => {
-    if (!token || !account) return initialData;
+    if (!token || !disperse || !account) return initialData;
 
     console.log("Fetching user's token balance...");
 
     const tokenAddress = getValues("tokenAddress");
     const tokenContract = token.attach(tokenAddress);
 
-    const balanceRequest = tokenContract.balanceOf(account);
-    let { data: balance, err: balanceErr } = await handle(balanceRequest);
+    let requests = Promise.all([tokenContract.balanceOf(account), tokenContract.decimals(), tokenContract.allowance(account, disperse.address)]);
+    let { data, err } = await handle(requests);
 
-    if (balanceErr || !balance) {
-      console.error("Error fetching user's token balance!");
+    if (err || !data || data.length !== 3) {
+      console.error("Error fetching user's token data!");
       return initialData;
     }
 
-    console.log("Fetching token's decimals...");
-
-    const decimalsRequest = tokenContract.decimals();
-    let { data: decimals, err: decimalsErr } = await handle(decimalsRequest);
-
-    if (decimalsErr || !decimals) {
-      console.error("Error fetching token's decimals!");
-      return initialData;
-    }
-
-    console.log("User's token balance fetched.");
-    return { balance, decimals };
+    console.log("User's token data fetched.");
+    return { balance: data[0], decimals: data[1], allowance: { disperse: data[2], disperseGasless: ZERO_BN } };
   };
 
   const {
     data: userToken,
     isLoading: isUserTokenLoading,
     isError: isUserTokenError,
-    refetch: UserTokenBalance,
+    refetch: refetchUserToken,
   } = useQuery(["balance", "token"], fetchUserToken, {
     enabled: !!(token && account),
     initialData: initialData,
   });
+
+  /**********************************************************/
+  /* Allowance  */
+  /**********************************************************/
+
+  const isNotApproved = () => {
+    if (!userToken) return false;
+    return userToken.balance.toString() === "0" || userToken.allowance.disperse.lt(userToken.balance);
+  };
+
+  const approve = async () => {
+    if (!disperse) return console.error("Can't connect to the disperse contract!");
+    if (!token) return console.error("Token not available!");
+    if (!wallet) return console.error("Wallet not available!");
+
+    // Get the signer from web3-onboard wallet
+    const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
+    const signer = ethersProvider.getSigner();
+
+    // Send the Disperse transaction
+    const tokenAddress = getValues("tokenAddress");
+    const approveReq = token.attach(tokenAddress).connect(signer).approve(disperse.address, userToken.balance);
+    const { data, err } = await handle(approveReq);
+
+    if (err || !data) return console.error("Approve transaction failed!", err);
+
+    refetchUserToken();
+  };
+
+  /**********************************************************/
+  /* Form submit */
+  /**********************************************************/
+
+  const onFormSubmit = async (data: { receivers: IReceiver[] }) => {
+    if (!disperse) return console.error("Can't connect to the disperse contract!");
+    if (!wallet) return console.error("Wallet not available!");
+
+    // Separate the receiver in addresses / amounts as the Disperse contract expects
+    const addresses = data.receivers.map((receiver: IReceiver) => receiver.address);
+    const amounts = data.receivers.map((receiver: IReceiver) => ethers.utils.parseUnits(receiver.amount.toString(), userToken.decimals));
+    const total = amounts.reduce((a, b) => a.add(b), ZERO_BN);
+
+    // Check if enough balance
+    if (total.gte(userToken.balance)) {
+      setIsEnoughTokeBalance(false);
+      return;
+    }
+
+    // Get the signer from web3-onboard wallet
+    const ethersProvider = new ethers.providers.Web3Provider(wallet.provider, process.env.NEXT_PUBLIC_NETWORK);
+    const signer = ethersProvider.getSigner();
+
+    // Send the Disperse transaction
+    const disperseReq = disperse.connect(signer).disperseTokenSimple(getValues("tokenAddress"), addresses, amounts);
+    const { data: disperseTxn, err: disperseTxnErr } = await handle(disperseReq);
+
+    setIsEnoughTokeBalance(true);
+
+    // Verify if the transaction was successful
+    if (disperseTxnErr || !disperseTxn) return console.error("Disperse transaction failed!");
+    console.log("Disperse transaction successful! ", disperseTxn.hash);
+  };
 
   return (
     <div className="min-h-screen p-10 text-white bg-slate-800">
@@ -195,6 +217,9 @@ const Home: NextPage = () => {
                   {...register("tokenAddress", {
                     required: true,
                     pattern: /^0x[a-fA-F0-9]{40}$/g,
+                    onBlur(event) {
+                      refetchUserToken();
+                    },
                   })}
                 />
 
@@ -215,6 +240,10 @@ const Home: NextPage = () => {
                 ) : (
                   <div className="p-3 text-xl rounded-lg bg-slate-700">{getReadableBN(userToken.balance, userToken.decimals)}</div>
                 )}
+
+                <button className="w-full py-4 mt-4 btn-main bg-slate-700 hover:bg-indigo-800 hover:ring-0" onClick={approve}>
+                  Approve
+                </button>
               </div>
             </div>
 
@@ -287,7 +316,12 @@ const Home: NextPage = () => {
                 </div>
               </div>
               <div>
-                <button className="w-full py-4 btn-main bg-slate-700 hover:bg-indigo-800 hover:ring-0">Send</button>
+                <button
+                  className={`w-full py-4 btn-main bg-slate-700 hover:bg-indigo-800 hover:ring-0 ${isNotApproved() ? "cursor-not-allowed" : ""}`}
+                  disabled={isNotApproved()}
+                >
+                  Send
+                </button>
                 {!isEnoughTokeBalance && <p className="form-err">Not enough balance</p>}
               </div>
             </form>
