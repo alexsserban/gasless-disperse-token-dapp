@@ -14,6 +14,10 @@ export type { IERC2771Recipient } from "./@opengsn/contracts/src/interfaces/IERC
 export { IERC2771Recipient__factory } from "./factories/@opengsn/contracts/src/interfaces/IERC2771Recipient__factory";
 export type { ERC20 } from "./@openzeppelin/contracts/token/ERC20/ERC20";
 export { ERC20__factory } from "./factories/@openzeppelin/contracts/token/ERC20/ERC20__factory";
+export type { ERC20Permit } from "./@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol/ERC20Permit";
+export { ERC20Permit__factory } from "./factories/@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol/ERC20Permit__factory";
+export type { IERC20Permit } from "./@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol/IERC20Permit";
+export { IERC20Permit__factory } from "./factories/@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol/IERC20Permit__factory";
 export type { IERC20Metadata } from "./@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata";
 export { IERC20Metadata__factory } from "./factories/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata__factory";
 export type { IERC20 } from "./@openzeppelin/contracts/token/ERC20/IERC20";
