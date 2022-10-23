@@ -29,7 +29,7 @@ contract DisperseGasless is ERC2771Recipient, Ownable {
         uint256[] memory values
     ) external {
         for (uint256 i = 0; i < recipients.length; i++)
-            require(token.transferFrom(msg.sender, recipients[i], values[i]));
+            require(token.transferFrom(_msgSender(), recipients[i], values[i]));
     }
 
     function _msgSender()
