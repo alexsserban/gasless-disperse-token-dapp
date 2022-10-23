@@ -4,9 +4,10 @@ import { useConnectWallet } from "@web3-onboard/react";
 import { useQuery } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { ethers } from "ethers";
-import { Biconomy } from "@biconomy/mexa";
 
 import useWeb3 from "hooks/useWeb3";
+import useBiconomy from "hooks/useBiconomy";
+
 import { ZERO_BN, handle, getReadableBN } from "utils";
 
 interface IReceiver {
@@ -17,6 +18,7 @@ interface IReceiver {
 const Home: NextPage = () => {
   const { provider, disperse, disperseGasless, token } = useWeb3();
   const [{ wallet }, connect] = useConnectWallet();
+  const { getBiconomy } = useBiconomy();
 
   const userAddress = wallet?.accounts[0].address || "";
   const userAddressFormatted = userAddress.slice(0, 4) + "..." + userAddress.slice(-4);
@@ -49,24 +51,6 @@ const Home: NextPage = () => {
     name: "receivers",
     control,
   });
-
-  /**********************************************************/
-  /* Biconomy */
-  /**********************************************************/
-
-  const getBiconomy = async (contract: string) => {
-    if (!wallet) return null;
-
-    const biconomy = new Biconomy(wallet.provider, {
-      apiKey: process.env.NEXT_PUBLIC_BICONOMY_KEY,
-      contractAddresses: [contract],
-      strictMode: false,
-    });
-
-    await biconomy.init();
-
-    return biconomy;
-  };
 
   /**********************************************************/
   /* User's ETH and Token Balance */
