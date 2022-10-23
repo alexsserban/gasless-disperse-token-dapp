@@ -17,12 +17,6 @@ const onboard = init({
   wallets: [injected],
   chains: [
     {
-      id: "0x1",
-      token: "ETH",
-      label: "Ethereum Mainnet",
-      rpcUrl: `https://mainnet.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_KEY}`,
-    },
-    {
       id: "0x5",
       token: "GoerliETH",
       label: "Goerli Testnet",
@@ -33,7 +27,7 @@ const onboard = init({
   appMetadata: {
     name: "Disperse Dapp",
     icon: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50" /></svg>',
-    description: "Distribute tokens to multiple addresses with gasless transaction",
+    description: "Distribute tokens to multiple addresses with gasless transactions",
     recommendedInjectedWallets: [{ name: "MetaMask", url: "https://metamask.io" }],
   },
   accountCenter: {
